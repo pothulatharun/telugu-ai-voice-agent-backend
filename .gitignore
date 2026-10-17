@@ -2,3 +2,6 @@
 .venv/
 __pycache__/
 *.wav
+businesses.db
+businesses.db-shm
+businesses.db-wal
