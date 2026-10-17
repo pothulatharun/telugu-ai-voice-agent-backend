@@ -16,7 +16,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5500",
         "http://127.0.0.1:5500",
-        # Add your actual GitHub Pages URL here before using the dashboard.
+        "https://pothulatharun.github.io",
     ],
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
