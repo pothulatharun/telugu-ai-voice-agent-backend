@@ -6,4 +6,4 @@ python-dotenv
 python-multipart
 
 websockets
-sarvamai=0.1.37
+sarvamai==0.1.37
