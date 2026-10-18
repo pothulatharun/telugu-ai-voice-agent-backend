@@ -1,7 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI,HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 from datetime import datetime, timezone
