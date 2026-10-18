@@ -7,7 +7,12 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 from datetime import datetime, timezone
-from business_config import get_business_config, save_business_config
+from business_config import (
+    get_business_config,
+    save_business_config,
+    get_supabase_settings,
+    get_headers,
+)
 
 load_dotenv()
 
@@ -196,7 +201,7 @@ def read_business_config(business_id: str):
 
     return config
     @app.post("/upload-leads/{business_id}")
-def upload_leads(business_id: str, file: UploadFile = File(...)):
+async def upload_leads(business_id: str, file: UploadFile = File(...)):
     import csv
     import io
 
