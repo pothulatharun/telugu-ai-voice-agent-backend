@@ -172,25 +172,10 @@ def update_business_config(config: BusinessConfigRequest):
         "message": "Business configuration saved",
         "business": saved,
     }
+
+
 @app.get("/business-config/{business_id}")
 def read_business_config(business_id: str):
-    def get_business_config(business_id: str):
-    url, _ = get_supabase_settings()
-
-    response = requests.get(
-        f"{url}/rest/v1/businesses",
-        headers=get_headers(),
-        params={
-            "business_id": f"eq.{business_id}",
-            "select": "business_id,business_name,google_form_url",
-            "limit": "1",
-        },
-        timeout=20,
-    )
-    response.raise_for_status()
-
-    rows = response.json()
-    return rows[0] if rows else None
     config = get_business_config(business_id)
 
     if config is None:
@@ -200,7 +185,9 @@ def read_business_config(business_id: str):
         )
 
     return config
-    @app.post("/upload-leads/{business_id}")
+
+
+@app.post("/upload-leads/{business_id}")
 async def upload_leads(business_id: str, file: UploadFile = File(...)):
     import csv
     import io
@@ -213,30 +200,46 @@ async def upload_leads(business_id: str, file: UploadFile = File(...)):
         )
 
     if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Please upload a CSV file")
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a CSV file"
+        )
 
     try:
         content = await file.read(2 * 1024 * 1024 + 1)
+
         if len(content) > 2 * 1024 * 1024:
-            raise HTTPException(status_code=413, detail="CSV must be 2 MB or smaller")
+            raise HTTPException(
+                status_code=413,
+                detail="CSV must be 2 MB or smaller"
+            )
 
         reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
-        if not reader.fieldnames:
-            raise HTTPException(status_code=400, detail="CSV needs a header row")
 
-        normalized_headers = {h.strip().lower() for h in reader.fieldnames if h}
-        if not {"customer_name", "phone_number"}.issubset(normalized_headers):
+        if not reader.fieldnames:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV needs a header row"
+            )
+
+        headers = {
+            h.strip().lower() for h in reader.fieldnames if h
+        }
+
+        if not {"customer_name", "phone_number"}.issubset(headers):
             raise HTTPException(
                 status_code=400,
                 detail="Headers must include customer_name and phone_number"
             )
 
         rows = []
+
         for row in reader:
             values = {
                 (key or "").strip().lower(): (value or "").strip()
                 for key, value in row.items()
             }
+
             name = values.get("customer_name", "")
             phone = values.get("phone_number", "")
 
@@ -246,21 +249,23 @@ async def upload_leads(business_id: str, file: UploadFile = File(...)):
                     "customer_name": name,
                     "phone_number": phone,
                     "interested": False,
-                    "whatsapp_consent": False
+                    "whatsapp_consent": False,
                 })
 
         if not rows:
-            raise HTTPException(status_code=400, detail="No valid leads found")
+            raise HTTPException(
+                status_code=400,
+                detail="No valid leads found"
+            )
 
-        # Save leads through the existing Supabase REST configuration.
-        # These helpers must be imported from business_config.py first.
         url, _ = get_supabase_settings()
+
         response = requests.post(
             f"{url}/rest/v1/leads",
             headers={
                 **get_headers(),
                 "Content-Type": "application/json",
-                "Prefer": "return=representation"
+                "Prefer": "return=representation",
             },
             json=rows,
             timeout=30,
@@ -270,12 +275,18 @@ async def upload_leads(business_id: str, file: UploadFile = File(...)):
         return {
             "message": "Leads uploaded successfully",
             "business_id": business_id,
-            "uploaded_count": len(rows)
+            "uploaded_count": len(rows),
         }
 
     except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="CSV must use UTF-8 encoding")
+        raise HTTPException(
+            status_code=400,
+            detail="CSV must use UTF-8 encoding"
+        )
     except requests.RequestException:
-        raise HTTPException(status_code=502, detail="Could not save leads")
+        raise HTTPException(
+            status_code=502,
+            detail="Could not save leads"
+        )
     finally:
         await file.close()
