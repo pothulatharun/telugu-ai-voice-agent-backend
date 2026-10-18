@@ -4,6 +4,7 @@ import csv
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 from datetime import datetime, timezone
@@ -13,11 +14,11 @@ from business_config import (
     get_supabase_settings,
     get_headers,
 )
-
+from exotel_bridge import router as exotel_router
 load_dotenv()
 
 app = FastAPI(title="AI Lead Calling Backend")
-
+app.include_router(exotel_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
