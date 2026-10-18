@@ -169,6 +169,23 @@ def update_business_config(config: BusinessConfigRequest):
     }
 @app.get("/business-config/{business_id}")
 def read_business_config(business_id: str):
+    def get_business_config(business_id: str):
+    url, _ = get_supabase_settings()
+
+    response = requests.get(
+        f"{url}/rest/v1/businesses",
+        headers=get_headers(),
+        params={
+            "business_id": f"eq.{business_id}",
+            "select": "business_id,business_name,google_form_url",
+            "limit": "1",
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+
+    rows = response.json()
+    return rows[0] if rows else None
     config = get_business_config(business_id)
 
     if config is None:
