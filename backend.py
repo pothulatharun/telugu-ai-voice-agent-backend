@@ -1,7 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 from datetime import datetime, timezone
@@ -165,3 +165,14 @@ def update_business_config(config: BusinessConfigRequest):
         "message": "Business configuration saved",
         "business": saved,
     }
+@app.get("/business-config/{business_id}")
+def read_business_config(business_id: str):
+    config = get_business_config(business_id)
+
+    if config is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Business settings not found"
+        )
+
+    return config
