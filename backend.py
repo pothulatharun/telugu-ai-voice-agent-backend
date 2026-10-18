@@ -195,3 +195,82 @@ def read_business_config(business_id: str):
         )
 
     return config
+    @app.post("/upload-leads/{business_id}")
+def upload_leads(business_id: str, file: UploadFile = File(...)):
+    import csv
+    import io
+
+    config = get_business_config(business_id)
+    if config is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Business settings not found"
+        )
+
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Please upload a CSV file")
+
+    try:
+        content = await file.read(2 * 1024 * 1024 + 1)
+        if len(content) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="CSV must be 2 MB or smaller")
+
+        reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+        if not reader.fieldnames:
+            raise HTTPException(status_code=400, detail="CSV needs a header row")
+
+        normalized_headers = {h.strip().lower() for h in reader.fieldnames if h}
+        if not {"customer_name", "phone_number"}.issubset(normalized_headers):
+            raise HTTPException(
+                status_code=400,
+                detail="Headers must include customer_name and phone_number"
+            )
+
+        rows = []
+        for row in reader:
+            values = {
+                (key or "").strip().lower(): (value or "").strip()
+                for key, value in row.items()
+            }
+            name = values.get("customer_name", "")
+            phone = values.get("phone_number", "")
+
+            if name and phone:
+                rows.append({
+                    "business_id": business_id,
+                    "customer_name": name,
+                    "phone_number": phone,
+                    "interested": False,
+                    "whatsapp_consent": False
+                })
+
+        if not rows:
+            raise HTTPException(status_code=400, detail="No valid leads found")
+
+        # Save leads through the existing Supabase REST configuration.
+        # These helpers must be imported from business_config.py first.
+        url, _ = get_supabase_settings()
+        response = requests.post(
+            f"{url}/rest/v1/leads",
+            headers={
+                **get_headers(),
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            },
+            json=rows,
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        return {
+            "message": "Leads uploaded successfully",
+            "business_id": business_id,
+            "uploaded_count": len(rows)
+        }
+
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="CSV must use UTF-8 encoding")
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="Could not save leads")
+    finally:
+        await file.close()
