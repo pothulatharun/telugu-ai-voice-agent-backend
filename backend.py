@@ -18,6 +18,21 @@ from exotel_bridge import router as exotel_router
 load_dotenv()
 
 app = FastAPI(title="AI Lead Calling Backend")
+import importlib.metadata
+
+@app.get("/diagnostics/sarvam")
+def check_sarvam_installation():
+    try:
+        version = importlib.metadata.version("sarvamai")
+        return {
+            "installed": True,
+            "version": version
+        }
+    except importlib.metadata.PackageNotFoundError:
+        return {
+            "installed": False,
+            "message": "Sarvam SDK is not installed"
+        }
 app.include_router(exotel_router)
 app.add_middleware(
     CORSMiddleware,
