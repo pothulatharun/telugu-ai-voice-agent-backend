@@ -1,13 +1,15 @@
 import os
 import io
 import csv
+import importlib.metadata
+from datetime import datetime, timezone
+
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi import WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
-from datetime import datetime, timezone
+
 from business_config import (
     get_business_config,
     save_business_config,
@@ -15,10 +17,25 @@ from business_config import (
     get_headers,
 )
 from exotel_bridge import router as exotel_router
+
+# Load environment variables first.
 load_dotenv()
 
+# WhatsApp stays disabled unless explicitly turned off in the environment.
+WHATSAPP_TEST_MODE = (
+    os.getenv("WHATSAPP_TEST_MODE", "true").strip().lower() == "true"
+)
+
 app = FastAPI(title="AI Lead Calling Backend")
-import importlib.metadata
+
+
+@app.get("/")
+def home():
+    return {
+        "status": "running",
+        "service": "AI Lead Calling Backend",
+    }
+
 
 @app.get("/diagnostics/sarvam")
 def check_sarvam_installation():
@@ -26,14 +43,17 @@ def check_sarvam_installation():
         version = importlib.metadata.version("sarvamai")
         return {
             "installed": True,
-            "version": version
+            "version": version,
         }
     except importlib.metadata.PackageNotFoundError:
         return {
             "installed": False,
-            "message": "Sarvam SDK is not installed"
+            "message": "Sarvam SDK is not installed",
         }
+
+
 app.include_router(exotel_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -105,14 +125,6 @@ class BusinessConfigRequest(BaseModel):
     google_form_url: HttpUrl
 
 
-@app.get("/")
-def home():
-    return {
-        "status": "running",
-        "service": "AI Lead Calling Backend",
-    }
-
-
 @app.post("/lead-interest")
 def mark_lead_interest(lead: LeadInterest):
     print("Received lead data:", lead.model_dump())
@@ -138,11 +150,18 @@ def mark_lead_interest(lead: LeadInterest):
         "whatsapp_sent": False,
     }
 
-    # Never send WhatsApp unless both conditions are true.
+    # Both interest and explicit consent are required.
     if not lead.interested or not lead.whatsapp_consent:
         result["message"] = (
             "Lead recorded; WhatsApp not sent because interest "
             "or consent is missing."
+        )
+        return result
+
+    # Do not send WhatsApp during testing.
+    if WHATSAPP_TEST_MODE:
+        result["message"] = (
+            "Lead recorded in test mode; WhatsApp sending is disabled."
         )
         return result
 
@@ -164,8 +183,6 @@ def mark_lead_interest(lead: LeadInterest):
         )
 
     except Exception as exc:
-        # Log the error without returning credentials or API details
-        # to the caller.
         print("WhatsApp sending failed:", str(exc))
         result["success"] = False
         result["message"] = (
@@ -197,28 +214,29 @@ def read_business_config(business_id: str):
     if config is None:
         raise HTTPException(
             status_code=404,
-            detail="Business settings not found"
+            detail="Business settings not found",
         )
 
     return config
 
 
 @app.post("/upload-leads/{business_id}")
-async def upload_leads(business_id: str, file: UploadFile = File(...)):
-    import csv
-    import io
-
+async def upload_leads(
+    business_id: str,
+    file: UploadFile = File(...),
+):
     config = get_business_config(business_id)
+
     if config is None:
         raise HTTPException(
             status_code=404,
-            detail="Business settings not found"
+            detail="Business settings not found",
         )
 
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=400,
-            detail="Please upload a CSV file"
+            detail="Please upload a CSV file",
         )
 
     try:
@@ -227,25 +245,31 @@ async def upload_leads(business_id: str, file: UploadFile = File(...)):
         if len(content) > 2 * 1024 * 1024:
             raise HTTPException(
                 status_code=413,
-                detail="CSV must be 2 MB or smaller"
+                detail="CSV must be 2 MB or smaller",
             )
 
-        reader = csv.DictReader(io.StringIO(content.decode("utf-8-sig")))
+        reader = csv.DictReader(
+            io.StringIO(content.decode("utf-8-sig"))
+        )
 
         if not reader.fieldnames:
             raise HTTPException(
                 status_code=400,
-                detail="CSV needs a header row"
+                detail="CSV needs a header row",
             )
 
         headers = {
-            h.strip().lower() for h in reader.fieldnames if h
+            header.strip().lower()
+            for header in reader.fieldnames
+            if header
         }
 
         if not {"customer_name", "phone_number"}.issubset(headers):
             raise HTTPException(
                 status_code=400,
-                detail="Headers must include customer_name and phone_number"
+                detail=(
+                    "Headers must include customer_name and phone_number"
+                ),
             )
 
         rows = []
@@ -271,7 +295,7 @@ async def upload_leads(business_id: str, file: UploadFile = File(...)):
         if not rows:
             raise HTTPException(
                 status_code=400,
-                detail="No valid leads found"
+                detail="No valid leads found",
             )
 
         url, _ = get_supabase_settings()
@@ -297,12 +321,12 @@ async def upload_leads(business_id: str, file: UploadFile = File(...)):
     except UnicodeDecodeError:
         raise HTTPException(
             status_code=400,
-            detail="CSV must use UTF-8 encoding"
+            detail="CSV must use UTF-8 encoding",
         )
     except requests.RequestException:
         raise HTTPException(
             status_code=502,
-            detail="Could not save leads"
+            detail="Could not save leads",
         )
     finally:
         await file.close()

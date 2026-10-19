@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Voice Agent | Business Settings</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6fb;
+      color: #172033;
+    }
+
+    header {
+      background: #151c35;
+      color: white;
+      padding: 22px 7%;
+    }
+
+    header h1 { margin: 0; font-size: 23px; }
+    header p { margin: 7px 0 0; color: #cbd3ee; }
+
+    main {
+      max-width: 700px;
+      margin: 45px auto;
+      padding: 0 18px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 8px 30px #1b285010;
+    }
+
+    h2 { margin-top: 0; }
+    .intro { color: #647089; line-height: 1.6; }
+
+    label {
+      display: block;
+      margin: 22px 0 8px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ccd3e0;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 25px;
+      padding: 14px;
+      border: 0;
+      border-radius: 8px;
+      background: #5146e5;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover { background: #4035c7; }
+
+    #status {
+      margin-top: 18px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .note {
+      margin-top: 22px;
+      padding: 14px;
+      background: #f0f3ff;
+      border-radius: 8px;
+      color: #46527a;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Voice Agent</h1>
+    <p>Business Settings</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Configure your business</h2>
+      <p class="intro">
+        Add your business details and the Google Form link that
+        your AI agent should share with interested leads.
+      </p>
+
+      <form id="businessForm">
+        <label for="businessId">Business ID</label>
+        <input id="businessId" value="demo_business"
+               required pattern="[a-zA-Z0-9_-]+">
+
+        <label for="businessName">Business name</label>
+        <input id="businessName" placeholder="e.g. ABC Recruitment"
+               required>
+
+        <label for="formUrl">Google Form URL</label>
+        <input id="formUrl" type="url"
+               placeholder="https://forms.gle/your-form-link"
+               required>
+
+        <button type="submit">Save Business Settings</button>
+      </form>
+
+      <p id="status" role="status"></p>
+
+      <div class="note">
+        Each business needs a unique Business ID. This demo page
+        is not yet connected to a secure login, so do not use it
+        to store real customer data or production business settings.
+      </div>
+    </section>
+  </main>
+
+ <script>
+  const API_URL =
+    "https://telugu-ai-voice-agent-backend.onrender.com/business-config";
+
+  const form = document.getElementById("businessForm");
+  const status = document.getElementById("status");
+  const businessId = document.getElementById("businessId");
+  const businessName = document.getElementById("businessName");
+  const formUrl = document.getElementById("formUrl");
+
+  // Load saved settings whenever the dashboard opens.
+  async function loadBusinessSettings() {
+    const id = businessId.value.trim();
+
+    if (!id) return;
+
+    status.textContent = "Loading saved settings...";
+
+    try {
+      const response = await fetch(
+        `${API_URL}/${encodeURIComponent(id)}`
+      );
+
+      if (response.status === 404) {
+        status.textContent = "No saved settings found for this Business ID.";
+        return;
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Could not load settings.");
+      }
+
+      businessName.value = result.business_name || "";
+      formUrl.value = result.google_form_url || "";
+
+      status.textContent = "Saved settings loaded.";
+    } catch (error) {
+      status.textContent =
+        "Could not load settings: " + error.message;
+    }
+  }
+
+  // Save settings to the backend.
+  form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    status.textContent = "Saving settings...";
+
+    const data = {
+      business_id: businessId.value.trim(),
+      business_name: businessName.value.trim(),
+      google_form_url: formUrl.value.trim()
+    };
+
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Request failed.");
+      }
+
+      businessName.value = result.business_name || data.business_name;
+      formUrl.value = result.google_form_url || data.google_form_url;
+
+      status.textContent = "Settings saved successfully.";
+    } catch (error) {
+      status.textContent = "Could not save: " + error.message;
+    }
+  });
+
+  // Load settings when the page first opens.
+  loadBusinessSettings();
+
+  // Load the correct settings when the Business ID changes.
+  businessId.addEventListener("change", loadBusinessSettings);
+</script>
+</body>
+</html>
