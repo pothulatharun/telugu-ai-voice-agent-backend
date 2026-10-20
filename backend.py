@@ -330,3 +330,46 @@ async def upload_leads(
         )
     finally:
         await file.close()
+
+
+@app.get("/leads/{business_id}")
+async def get_business_leads(business_id: str):
+    config = get_business_config(business_id)
+
+    if config is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Business settings not found",
+        )
+
+    url, _ = get_supabase_settings()
+
+    try:
+        response = requests.get(
+            f"{url}/rest/v1/leads",
+            headers=get_headers(),
+            params={
+                "business_id": f"eq.{business_id}",
+                "select": (
+                    "business_id,customer_name,phone_number,"
+                    "interested,whatsapp_consent"
+                ),
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        leads = response.json()
+
+        return {
+            "business_id": business_id,
+            "lead_count": len(leads),
+            "leads": leads,
+            "calls_started": False,
+        }
+
+    except requests.RequestException:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not retrieve leads",
+        )
