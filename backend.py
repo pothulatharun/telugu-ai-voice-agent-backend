@@ -53,8 +53,8 @@ def check_sarvam_installation():
         }
 
 
-    app.include_router(exotel_router)
-    app.include_router(exotel_test_router)  
+app.include_router(exotel_router)
+app.include_router(exotel_test_router)  
 
 app.add_middleware(
     CORSMiddleware,
