@@ -17,6 +17,7 @@ from business_config import (
     get_headers,
 )
 from exotel_bridge import router as exotel_router
+from exotel_bridge_audio_test import router as exotel_test_router
 
 # Load environment variables first.
 load_dotenv()
@@ -52,7 +53,8 @@ def check_sarvam_installation():
         }
 
 
-app.include_router(exotel_router)
+    app.include_router(exotel_router)
+    app.include_router(exotel_test_router)  
 
 app.add_middleware(
     CORSMiddleware,
